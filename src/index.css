@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.mapboxgl-map {
+  height: 100%;
+  width: 100%;
+}
