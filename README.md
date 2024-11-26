@@ -4,5 +4,5 @@ Interactive app for exploring STAC wildfire event data, built with React and Map
 
 ## Demo
 
-![Demo Video](assets/demo-video.gif)
+![Demo Video](src/assets/demo-video.gif)
 
