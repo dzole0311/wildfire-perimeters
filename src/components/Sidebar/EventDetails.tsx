@@ -10,11 +10,19 @@ interface EventDetailsProps {
 export default function EventDetails({ feature, onBack }: EventDetailsProps) {
   const { properties: p } = feature;
 
+  const farea = p.farea ?? 0;
+  const duration = p.duration ?? 0;
+  const meanfrp = p.meanfrp ?? 0;
+  const fperim = p.fperim ?? 0;
+  const pixden = p.pixden ?? 0;
+  const n_newpixels = p.n_newpixels ?? 0;
+  const n_pixels = p.n_pixels ?? 0;
+
   const chartData = [
-    { name: 'Day 1', value: p.meanfrp },
-    { name: 'Day 2', value: p.meanfrp * 0.9 },
-    { name: 'Day 3', value: p.meanfrp * 0.8 },
-    { name: 'Day 4', value: p.meanfrp * 0.7 },
+    { name: 'Day 1', value: meanfrp },
+    { name: 'Day 2', value: meanfrp * 0.9 },
+    { name: 'Day 3', value: meanfrp * 0.8 },
+    { name: 'Day 4', value: meanfrp * 0.7 },
   ];
 
   return (
@@ -27,28 +35,26 @@ export default function EventDetails({ feature, onBack }: EventDetailsProps) {
       </button>
 
       <div className="space-y-3">
-
         <div className="bg-white/5 p-3 rounded">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <div className="text-[11px] text-gray-400">Area</div>
-              <div className="text-sm text-white/90">{p.farea.toFixed(2)} km²</div>
+              <div className="text-sm text-white/90">{farea.toFixed(2)} km²</div>
             </div>
             <div>
               <div className="text-[11px] text-gray-400">Duration</div>
-              <div className="text-sm text-white/90">{p.duration} days</div>
+              <div className="text-sm text-white/90">{duration} days</div>
             </div>
             <div>
               <div className="text-[11px] text-gray-400">Mean FRP</div>
-              <div className="text-sm text-white/90">{p.meanfrp.toFixed(2)} MW</div>
+              <div className="text-sm text-white/90">{meanfrp.toFixed(2)} MW</div>
             </div>
             <div>
               <div className="text-[11px] text-gray-400">Perimeter</div>
-              <div className="text-sm text-white/90">{p.fperim.toFixed(2)} km</div>
+              <div className="text-sm text-white/90">{fperim.toFixed(2)} km</div>
             </div>
           </div>
         </div>
-
 
         <div className="bg-white/5 p-3 rounded">
           <div className="text-[11px] text-gray-400 mb-2">Fire Radiative Power Trend</div>
@@ -90,11 +96,11 @@ export default function EventDetails({ feature, onBack }: EventDetailsProps) {
             <div className="text-gray-400">Region</div>
             <div className="text-white/90">{p.region}</div>
             <div className="text-gray-400">Pixel Density</div>
-            <div className="text-white/90">{p.pixden.toFixed(2)} px/km²</div>
+            <div className="text-white/90">{pixden.toFixed(2)} px/km²</div>
             <div className="text-gray-400">New Pixels</div>
-            <div className="text-white/90">{p.n_newpixels}</div>
+            <div className="text-white/90">{n_newpixels}</div>
             <div className="text-gray-400">Total Pixels</div>
-            <div className="text-white/90">{p.n_pixels}</div>
+            <div className="text-white/90">{n_pixels}</div>
             <div className="text-gray-400">Status</div>
             <div>
               <span className={`px-1.5 py-0.5 text-[10px] rounded ${

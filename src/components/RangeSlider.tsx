@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { LineChart, Line, YAxis, ResponsiveContainer, TooltipProps, Tooltip } from 'recharts';
-import { Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw, Filter } from 'lucide-react';
+import { EventFeature } from '../types/events';
 
 interface RangeSliderProps {
-  events: any[];
+  events: EventFeature[];
   onRangeChange: (range: { start: Date; end: Date }) => void;
+  onFiltersChange: (filters: Record<string, { min: number; max: number }>) => void;
 }
 
 const CHART_PROPERTIES = [
@@ -14,6 +16,12 @@ const CHART_PROPERTIES = [
   { value: 'meanfrp', label: 'Mean Fire Radiative Power (MW)', formatter: (v: number) => `${v.toFixed(2)} MW` },
   { value: 'duration', label: 'Duration (days)', formatter: (v: number) => `${v.toFixed(0)} days` },
   { value: 'n_pixels', label: 'Number of Pixels', formatter: (v: number) => v.toString() }
+];
+
+const FILTER_OPTIONS = [
+  { id: 'farea', label: 'Fire Area', unit: 'km²', min: 0, max: 100 },
+  { id: 'duration', label: 'Duration', unit: 'days', min: 0, max: 30 },
+  { id: 'meanfrp', label: 'Mean FRP', unit: 'MW', min: 0, max: 1000 }
 ];
 
 const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
@@ -33,27 +41,15 @@ const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>)
   return null;
 };
 
-const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
+const RangeSlider = ({ events, onRangeChange, onFiltersChange }: RangeSliderProps) => {
   const [dragging, setDragging] = useState<'start' | 'end' | 'selection' | null>(null);
-  const [range, setRange] = useState({ start: 0, end: 100 });
   const [dimensions, setDimensions] = useState({ width: 0 });
   const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed] = useState(1);
   const [selectedProperty, setSelectedProperty] = useState(CHART_PROPERTIES[0].value);
-
-  const chartData = useMemo(() => {
-    const sortedEvents = [...events].sort(
-      (a, b) => new Date(a.properties.timestamp).getTime() - new Date(b.properties.timestamp).getTime()
-    );
-
-    return sortedEvents.map(event => ({
-      timestamp: new Date(event.properties.timestamp).getTime(),
-      ...Object.fromEntries(
-        CHART_PROPERTIES.map(prop => [prop.value, event.properties[prop.value]])
-      )
-    }));
-  }, [events]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Record<string, { min: number; max: number }>>({});
 
   const dates = useMemo(() =>
     events
@@ -62,31 +58,79 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
       .sort((a, b) => a - b)
   , [events]);
 
-  const { minDate, maxDate, totalRange } = useMemo(() => ({
-    minDate: new Date(dates[0] || Date.now()),
-    maxDate: new Date(dates[dates.length - 1] || Date.now()),
-    totalRange: Math.max(1, dates[dates.length - 1] - dates[0] || 1)
-  }), [dates]);
+  const absoluteMinDate = new Date('2024-08-03').getTime();
+  const absoluteMaxDate = new Date('2024-09-30').getTime();
 
-  const getDateFromPosition = useCallback((position: number) => {
-    if (!dimensions.width) return minDate;
-    const percentage = Math.max(0, Math.min(position / dimensions.width, 1));
-    return new Date(minDate.getTime() + (totalRange * percentage));
-  }, [minDate, totalRange, dimensions.width]);
+  const { minDate, maxDate, totalRange } = useMemo(() => ({
+    minDate: absoluteMinDate,
+    maxDate: absoluteMaxDate,
+    totalRange: absoluteMaxDate - absoluteMinDate
+  }), []);
+
+  const [range, setRange] = useState(() => {
+    if (!dimensions.width) return { start: 0, end: 100 };
+
+    const defaultStartDate = new Date('2024-02-01').getTime();
+    const defaultEndDate = new Date('2024-12-01').getTime();
+
+    const getPositionFromDate = (date: number) => {
+      const percentage = (date - minDate) / totalRange;
+      return Math.max(0, Math.min(dimensions.width * percentage, dimensions.width));
+    };
+
+    return {
+      start: getPositionFromDate(defaultStartDate),
+      end: getPositionFromDate(defaultEndDate)
+    };
+  });
 
   useEffect(() => {
     if (containerRef) {
       const width = containerRef.getBoundingClientRect().width;
       setDimensions({ width });
-    }
-  }, [containerRef]);
 
-  useEffect(() => {
-    if (dimensions.width > 0 && range.end === 100) {
-      setRange({ start: 0, end: dimensions.width });
-      onRangeChange({ start: minDate, end: maxDate });
+      const defaultStartDate = new Date('2024-06-01').getTime();
+      const defaultEndDate = new Date('2024-08-30').getTime();
+
+      const getPositionFromDate = (date: number) => {
+        const percentage = (date - minDate) / totalRange;
+        return Math.max(0, Math.min(width * percentage, width));
+      };
+
+      setRange({
+        start: getPositionFromDate(defaultStartDate),
+        end: getPositionFromDate(defaultEndDate)
+      });
+
+      onRangeChange({
+        start: new Date(defaultStartDate),
+        end: new Date(defaultEndDate)
+      });
     }
-  }, [dimensions.width, minDate, maxDate, onRangeChange, range.end]);
+  }, [containerRef, minDate, maxDate, totalRange, onRangeChange]);
+
+  const chartData = useMemo(() => {
+    if (events.length === 0) return [];
+
+    const sortedEvents = [...events].sort(
+      (a, b) => new Date(a.properties.t).getTime() - new Date(b.properties.t).getTime()
+    );
+
+    return sortedEvents.map(event => ({
+      timestamp: new Date(event.properties.t).getTime(),
+      farea: event.properties.farea,
+      duration: event.properties.duration,
+      meanfrp: event.properties.meanfrp,
+      fperim: event.properties.fperim,
+      n_pixels: event.properties.n_pixels
+    }));
+  }, [events]);
+
+  const getDateFromPosition = useCallback((position: number) => {
+    if (!dimensions.width) return minDate;
+    const percentage = Math.max(0, Math.min(position / dimensions.width, 1));
+    return new Date(minDate + (totalRange * percentage));
+  }, [minDate, totalRange, dimensions.width]);
 
   useEffect(() => {
     let animationFrame: number;
@@ -183,9 +227,12 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
   }, [dragging, handleMouseMove, handleMouseUp]);
 
   return (
-    <div className="bg-black/70 p-4 space-y-4 w-full max-w-[800px] absolute bottom-[17px] left-[calc(50%-160px)] transform -translate-x-1/2 z-10">
+    <div className="bg-black/70 p-4 space-y-4 w-full max-w-[800px] absolute bottom-[17px] left-[calc(50%-160px)] transform -translate-x-1/2 z-10 rounded-2xl border border-white/10 backdrop-blur-sm">
       <div className="relative">
-        <div className="h-24">
+        <div
+          className={`h-24 relative ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          onMouseDown={(e) => handleMouseDown(e, 'selection')}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <Line
@@ -203,22 +250,23 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
               <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ stroke: 'white', strokeWidth: 1, strokeOpacity: 0.1 }}
+                active={!dragging}
               />
             </LineChart>
           </ResponsiveContainer>
+
+          <div
+            className="absolute bottom-0 top-0 bg-white/10 pointer-events-none rounded-lg"
+            style={{
+              left: `${range.start}px`,
+              width: `${range.end - range.start}px`
+            }}
+          />
         </div>
 
         <div
-          className="absolute bottom-0 top-0 bg-white/10 pointer-events-none"
-          style={{
-            left: `${range.start}px`,
-            width: `${range.end - range.start}px`
-          }}
-        />
-
-        <div
           ref={setContainerRef}
-          className="relative h-1.5 bg-gray-800/50 cursor-pointer mt-8"
+          className="relative h-1.5 bg-gray-800/50 mt-2 rounded-full"
           onMouseDown={(e) => handleMouseDown(e, 'selection')}
         >
           <div
@@ -230,7 +278,7 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
           />
 
           <div
-            className="absolute cursor-grab active:cursor-grabbing h-10"
+            className={`absolute h-10 ${dragging === 'selection' ? 'cursor-grabbing' : 'cursor-grab'}`}
             style={{
               left: `${range.start}px`,
               width: `${range.end - range.start}px`,
@@ -272,22 +320,33 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
       </div>
 
       <div className="flex items-center justify-between pt-8">
-        <select
-          value={selectedProperty}
-          onChange={(e) => setSelectedProperty(e.target.value)}
-          className="bg-gray-800 text-white px-3 py-1.5 border border-gray-700 text-sm min-w-[200px]"
-        >
-          {CHART_PROPERTIES.map(prop => (
-            <option key={prop.value} value={prop.value}>
-              {prop.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-4">
+          <select
+            value={selectedProperty}
+            onChange={(e) => setSelectedProperty(e.target.value)}
+            className="bg-gray-800 text-white px-3 py-1.5 border border-gray-700 text-sm min-w-[200px] rounded-lg"
+          >
+            {CHART_PROPERTIES.map(prop => (
+              <option key={prop.value} value={prop.value}>
+                {prop.label}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 transition-colors rounded-lg flex items-center gap-2 text-sm
+              ${showFilters ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/80'}`}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+          </button>
+        </div>
 
         <div className="flex space-x-4">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="p-2 hover:bg-white/10 transition-colors"
+            className="p-2 hover:bg-white/10 transition-colors rounded-lg"
           >
             {isPlaying ? (
               <Pause className="w-5 h-5 text-white/80" />
@@ -297,12 +356,67 @@ const RangeSlider = ({ events, onRangeChange }: RangeSliderProps) => {
           </button>
           <button
             onClick={handleReset}
-            className="p-2 hover:bg-white/10 transition-colors"
+            className="p-2 hover:bg-white/10 transition-colors rounded-lg"
           >
             <RotateCcw className="w-5 h-5 text-white/80" />
           </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="pt-4 border-t border-white/10 space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            {FILTER_OPTIONS.map(filter => (
+              <div key={filter.id} className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/80">{filter.label}</span>
+                  <span className="text-gray-400">{filter.unit}</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    min={filter.min}
+                    max={filter.max}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-white"
+                    value={filters[filter.id]?.min ?? ''}
+                    onChange={(e) => {
+                      const newFilters = {
+                        ...filters,
+                        [filter.id]: {
+                          ...filters[filter.id],
+                          min: e.target.value ? Number(e.target.value) : undefined
+                        }
+                      };
+                      setFilters(newFilters);
+                      onFiltersChange(newFilters);
+                    }}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    min={filter.min}
+                    max={filter.max}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-sm text-white"
+                    value={filters[filter.id]?.max ?? ''}
+                    onChange={(e) => {
+                      const newFilters = {
+                        ...filters,
+                        [filter.id]: {
+                          ...filters[filter.id],
+                          max: e.target.value ? Number(e.target.value) : undefined
+                        }
+                      };
+                      setFilters(newFilters);
+                      onFiltersChange(newFilters);
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
