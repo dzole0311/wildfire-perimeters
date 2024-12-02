@@ -89,8 +89,8 @@ const RangeSlider = ({ events, onRangeChange, onFiltersChange }: RangeSliderProp
       const width = containerRef.getBoundingClientRect().width;
       setDimensions({ width });
 
-      const defaultStartDate = new Date('2024-06-01').getTime();
-      const defaultEndDate = new Date('2024-08-30').getTime();
+      const defaultStartDate = new Date('2024-08-30').getTime();
+      const defaultEndDate = new Date('2024-09-30').getTime();
 
       const getPositionFromDate = (date: number) => {
         const percentage = (date - minDate) / totalRange;

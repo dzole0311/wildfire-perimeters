@@ -19,7 +19,7 @@ export default function EventList({ features, selectedId, onSelectFeature }: Eve
   const groupRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const groupedEvents = useMemo(() => {
-    return features.reduce((acc: GroupedEvents, feature) => {
+    const groupedByFireId = features.reduce((acc: GroupedEvents, feature) => {
       const fireId = feature.properties.fireid.toString();
       if (!acc[fireId]) {
         acc[fireId] = [];
@@ -27,6 +27,27 @@ export default function EventList({ features, selectedId, onSelectFeature }: Eve
       acc[fireId].push(feature);
       return acc;
     }, {});
+
+    const deduplicatedGroups: GroupedEvents = {};
+
+    Object.entries(groupedByFireId).forEach(([fireId, events]) => {
+      const uniqueEvents = new Map<string, EventFeature>();
+
+      events.forEach(event => {
+        const timestamp = event.properties.t;
+        const existingEvent = uniqueEvents.get(timestamp);
+
+        if (!existingEvent ||
+            (event.properties.n_newpixels > existingEvent.properties.n_newpixels) ||
+            (event.properties.meanfrp > existingEvent.properties.meanfrp)) {
+          uniqueEvents.set(timestamp, event);
+        }
+      });
+
+      deduplicatedGroups[fireId] = Array.from(uniqueEvents.values());
+    });
+
+    return deduplicatedGroups;
   }, [features]);
 
   useEffect(() => {
